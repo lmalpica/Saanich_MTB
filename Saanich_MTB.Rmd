@@ -1,0 +1,104 @@
+---
+title: "Saanich inlet and BC inset"
+author: "Monica Torres-Beltrán"
+date: "April 12, 2017"
+output:
+  pdf_document: default
+  html_document:
+    code_folding: hide
+---
+
+```{r}
+# housekeeping
+rm(list=ls())
+
+#required packages
+#I really do not remember if you will need all of them...
+library(geosphere)
+library(mapdata)
+library(rgeos) 
+library(maptools)
+library(raster)
+library (sp) #
+library(ggplot2) 
+library(ggmap) 
+library(maps) 
+library(rgdal) 
+library(plyr)  
+library(grid)  
+library(GISTools)
+#library(shapefiles)
+
+#Call scalebar (+arrow) functions
+#To customize these go to BarArrowFunction, file must be on same folder or properly directed
+source("functions/BarArrowFunction.R")
+```
+
+```{r}
+#Load a shapefile file####
+#call shapefile of Canada map
+#all these calls help us to analyze the type of file
+cdn=readShapeSpatial("data/gpr_000b11a_e.shp")
+proj4string(cdn) <-"+proj=moll +ellps=WGS84" #equal area projection
+summary(cdn)
+bbox(cdn)
+proj4string(cdn)
+head(cdn@data)
+
+#Plot the whole Canada####
+#first prepare data file
+#given that the file contains different polygons, we join them in a "single" file to plot them together
+cdn@data$id = rownames(cdn@data)
+#simplecdn <- gSimplify(cdn, tol = 5, topologyPreserve = T)
+#cdn.points = fortify(cdn, region="id")
+#cdn.df = join(cdn.points, cdn@data, by="id")
+
+
+#subset the database to select BC
+BC.df<-subset(cdn, cdn$PRENAME == "British Columbia")
+simpleBC.df <- gSimplify(BC.df, tol=.01, topologyPreserve=T)
+bbox(simpleBC.df)
+
+#BC as Inset map
+#Zoom in rectangle for inset map
+pol<-data.frame(xmin=-123,xmax=-124 ,ymin=48.4 ,ymax=48.9)
+#Create inset map
+p2 <- ggplot() + geom_polygon(data = simpleBC.df, aes(x = long, y = lat, group = group)) + 
+  coord_map(xlim = c(-139.05220, -114.05422), ylim = c(48.1, 60.00004))+
+  theme_bw() + 
+    geom_rect(data = pol, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), alpha=0, colour="red", size = 1, linetype=1)+
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()) + 
+  theme(axis.text.x =element_blank(),axis.text.y= element_blank(), axis.ticks=element_blank(),axis.title.x =element_blank(),axis.title.y= element_blank())
+
+#further subset database to select Saanich area
+#saan.df<-subset(cdn, cdn$PRENAME == "British Columbia")
+
+#Plot main map
+SaanIn <-ggplot(BC.df, aes(long, lat))+geom_polygon(aes(group=group)) + 
+  coord_map(xlim = c(-123.68, -123.12),ylim = c(48.45, 48.8)) + 
+  labs(title = "Saanich Inlet, BC") +
+  theme_bw() + # Omit default grey backdrop
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())+ #Omit default backdrop outline and inner grey gridlines
+  xlab("")+ylab("")+
+  scale_x_continuous(breaks=seq(-123.6,-123.2, 0.2), labels=c(paste(seq(-123.6,-123.2, 0.2),"°W", sep="")))+
+  scale_y_continuous(breaks=seq(48.5,48.7,0.1), labels=c(paste(seq(48.5,48.7,0.1),"°N", sep="")))+
+  theme(axis.text.y =element_text(angle = 90, hjust=0.5)) +
+  theme(axis.text=element_text(size=15)) +
+  scaleBar(lon = -123.24, lat = 48.46, distanceLon = 3, distanceLat = .8, distanceLegend = 2, dist.unit = "km", orientation = TRUE)
+p1 <- SaanIn
+
+#plot main and inset together
+pdf("graphs/Saanich.pdf", width = 8, height = 8, useDingbats = F)
+grid.newpage()
+vpb_ <- viewport(width = 1, height = 1, x = 0.5, y = 0.5)  # place larger map
+vpa_ <- viewport(width = 0.38, height = 0.38, x = 0.78, y = 0.77)  # inset in upper left
+print(p1, vp = vpb_)
+print(p2, vp = vpa_)
+dev.off()
+
+ggsave("graphs/Saanich.pdf", width = 10, height = 6, useDingbats=FALSE)
+
+```
+
